@@ -21,8 +21,10 @@ pass/CMakeFiles/DungnPass.dir/DungnPass.cc.o
  /clang+llvm/include/llvm/ADT/SmallPtrSet.h
  /clang+llvm/include/llvm/ADT/SmallString.h
  /clang+llvm/include/llvm/ADT/SmallVector.h
+ /clang+llvm/include/llvm/ADT/StringExtras.h
  /clang+llvm/include/llvm/ADT/StringMap.h
  /clang+llvm/include/llvm/ADT/StringRef.h
+ /clang+llvm/include/llvm/ADT/StringSwitch.h
  /clang+llvm/include/llvm/ADT/Twine.h
  /clang+llvm/include/llvm/ADT/ilist.h
  /clang+llvm/include/llvm/ADT/ilist_base.h
@@ -92,17 +94,26 @@ pass/CMakeFiles/DungnPass.dir/DungnPass.cc.o
  /clang+llvm/include/llvm/Support/AtomicOrdering.h
  /clang+llvm/include/llvm/Support/CBindingWrapping.h
  /clang+llvm/include/llvm/Support/Casting.h
+ /clang+llvm/include/llvm/Support/Chrono.h
  /clang+llvm/include/llvm/Support/CodeGen.h
  /clang+llvm/include/llvm/Support/CommandLine.h
  /clang+llvm/include/llvm/Support/Compiler.h
  /clang+llvm/include/llvm/Support/DataTypes.h
+ /clang+llvm/include/llvm/Support/Debug.h
  /clang+llvm/include/llvm/Support/Endian.h
+ /clang+llvm/include/llvm/Support/Error.h
  /clang+llvm/include/llvm/Support/ErrorHandling.h
+ /clang+llvm/include/llvm/Support/ErrorOr.h
+ /clang+llvm/include/llvm/Support/FileSystem.h
+ /clang+llvm/include/llvm/Support/Format.h
+ /clang+llvm/include/llvm/Support/FormatProviders.h
+ /clang+llvm/include/llvm/Support/FormatVariadicDetails.h
  /clang+llvm/include/llvm/Support/Host.h
  /clang+llvm/include/llvm/Support/MD5.h
  /clang+llvm/include/llvm/Support/ManagedStatic.h
  /clang+llvm/include/llvm/Support/MathExtras.h
  /clang+llvm/include/llvm/Support/MemAlloc.h
+ /clang+llvm/include/llvm/Support/NativeFormatting.h
  /clang+llvm/include/llvm/Support/Options.h
  /clang+llvm/include/llvm/Support/PointerLikeTypeTraits.h
  /clang+llvm/include/llvm/Support/RWMutex.h

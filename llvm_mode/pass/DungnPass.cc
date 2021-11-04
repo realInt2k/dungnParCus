@@ -11,9 +11,17 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/Support/FileSystem.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#include <algorithm>
+#include <cassert>
+#include <cstdint>
+#include <memory>
+#include <utility>
+#include <vector>
+#include <fstream>
 
 using namespace llvm;
 
@@ -53,20 +61,37 @@ Function *getInt2kHandleFuncName(Module &M);
 Function *getInt2kTranslateName(Module &M);
 Function *getInt2kHandleMetaData(Module &M);
 
+// migrating from Module.cpp
+void dfs(int x);
+void freemem();
+void injectSVFInfo(Module &M);
+void readSVF();
+int runSVF();
+void dumpToFile(Module &M);
+bool SVF_Flag = false;
+std::vector<std::string> needInstrumentedFunc;
+std::vector<Function *> *unrelatedFunc;
+std::map<std::string, int> nodeID;
+std::string *nodeName;
+std::vector<int> *adj;
+int _nNode, _nEdge;
+std::map<int, Function*> funcAddr;
+bool *visited;
+//---
 std::map<std::string, bool> needInstrument;
 
 struct Int2kVisitor : public InstVisitor<Int2kVisitor>
 {
   void visitFunction(Function &F) 
   {
-    if(F.begin()==F.end() )//|| !needInstrument[F.getName().str()])
+    if(F.begin()==F.end() || !needInstrument[F.getName().str()])
       return;
       
     LLVMContext &C = F.getParent()->getContext();
     BasicBlock *b = &*F.begin();
     IRBuilder<> builder(b, b->begin());
     Value *funcNameStr = getFuncNameStr(builder, &F);
-    errs() << F.getName() << "\n";
+    //errs() << F.getName() << "\n";
     SmallVector<Value*, 1> params;
     params.push_back(funcNameStr);
     builder.CreateCall(int2kCheck, params);
@@ -146,18 +171,138 @@ void insertThings(Module &M)
 class DungN : public ModulePass {
 public:
   static char ID;
-  DungN():ModulePass(ID) {}
-  
+  DungN():ModulePass(ID) {} 
   bool runOnModule(Module &M) override;
 };
 
 bool DungN::runOnModule(Module &M)
 {
+  errs() << "\ngluten tag, 동료 >:)\n";
+  dumpToFile(M); // int2kBC.bc;
+  if(!runSVF())
+    return true;
+  errs() << "\ndone running SVF\n";
+	readSVF();
+  errs() << "\ndone reading SVF\n";
+	injectSVFInfo(M); 
+  errs() << "\ndone injecting infos\n";
+  //for(int i = 0; i < (int)M.needInstrumentedFunc.size(); ++i) {
+  //  needInstrument[needInstrumentedFunc[i]] = true;
+  //}
 	getThings(M);
 	insertThings(M);
-  
   errs() << "finished DungN pass\n";
+  system("rm callgraph_final.dot callgraph_initial.dot 1> /dev/null");
+  system("rm int2kGraph.txt int2kInfo.txt int2kBC.txt int2kBC.bc 1> /dev/null");
+  errs() << "\n";
+  freemem();
   return false;
+}
+
+void dfs(int x)
+{
+  visited[x] = true;
+  for(int i = 0; i < (int)adj[x].size(); ++i)
+  {
+    if(!visited[adj[x][i]])
+      dfs(adj[x][i]);
+  }
+}
+
+void freemem()
+{
+  delete [] nodeName;
+  delete [] adj;
+  delete [] visited;
+}
+
+void injectSVFInfo(Module &M)
+{
+  if(!SVF_Flag)
+  {
+    freemem();
+    return;
+  }
+  for(auto it = M.begin(), eit = M.end();
+    it != eit; it ++)
+    {
+      Function *func = &*it;
+      int id = nodeID[func->getName().str()];
+      funcAddr[id] = func;
+    }
+  for(auto it = M.begin(), eit = M.end();
+    it != eit; it ++)
+    {
+      Function *func = &*it;
+      int id = nodeID[func->getName().str()];
+      std::memset(visited, false, sizeof(visited));
+      dfs(id);
+      for(int j = 0; j < _nNode; ++j)
+      {
+        if(!visited[j])
+          unrelatedFunc[id].push_back(funcAddr[j]);
+      }
+    }
+}
+
+void readSVF()
+{
+  if(!SVF_Flag)
+  {
+    errs() << "SVF_Flag is false, please check if SVF is installed to your PATH\n";
+    errs() << "to check, command 'wpa --version' should output version of some llvm\n";
+    return ;
+  }
+  std::fstream file;
+  file.open("int2kInfo.txt", std::ios::in);
+  file >> _nNode >> _nEdge;
+  int n = _nNode, m = _nEdge;
+  file.close();
+  adj = new std::vector<int>[n];
+  nodeName = new std::string[n];
+  visited = new bool[n];
+  file.open("int2kGraph.txt", std::ios::in);
+  std::string x, y;
+  int nodeMarker = 0;
+  for(int i = 0; i < n; ++i)
+  {
+    file >> x;
+    if(nodeID.find(x) == nodeID.end()) {
+      nodeID[x] = nodeMarker ++;
+    }
+    int ID = nodeID[x];
+    nodeName[ID] = x;
+    needInstrument[x] = true;
+  }
+  unrelatedFunc = new std::vector<Function*>[nodeMarker];
+  for(int i = 0; i < m; ++i)
+  {
+    file >> x >> y;
+    int ID1 = nodeID[x], ID2 = nodeID[y];
+    adj[ID2].push_back(ID1);
+  }
+  file.close();
+}
+
+
+int runSVF()
+{
+  int res = system("wpa -ander -dump-callgraph int2kBC.bc > /dev/null");
+  if(res != 0)
+    errs () << "run SVF command failed, should install SVF first. \n";
+  else
+    SVF_Flag = true;
+  return SVF_Flag;
+}
+
+
+void dumpToFile(Module &M)
+{
+  std::error_code EC;
+  raw_ostream *out = new raw_fd_ostream("int2kBC.txt", EC, llvm::sys::fs::FileAccess::FA_Write);
+  M.print(*out, nullptr, false, false);
+  system("llvm-as int2kBC.txt -o int2kBC.bc");
+  //errs() << "int2kBC.bc created\n";
 }
 
 Function *getInt2kHandleMetaData(Module &M) 
@@ -222,7 +367,7 @@ Function* makeMarkFunctionID(Module &M)
    * * * * * * * * * * * * * * * * * * * * * * */
   // 1st argument is cnt  
   // 3rd argument is tmp4 (derived from tmp3, which is made from tmp2) -- the array of names
-	/*
+	
   std::vector<Constant*> bIndex;
   std::vector<Constant*> namesVec1; // name of the unrelated functions (flatten)
   bIndex.push_back(ConstantInt::get(Type::getInt32Ty(C), 0));
@@ -230,11 +375,14 @@ Function* makeMarkFunctionID(Module &M)
   cnt = 1;
   for(auto f1 = M.begin(), fle = M.end(); f1!=fle; ++f1)
   {
-    sum += (int)f1->unrelatedFunc.size();
+    if(nodeID.find(f1->getName().str()) == nodeID.end())
+      continue;
+    int id = nodeID[f1->getName().str()];
+    sum += (int)unrelatedFunc[id].size();
     bIndex.push_back(ConstantInt::get(Type::getInt32Ty(C), sum));
-    for(int i = 0; i < (int)f1->unrelatedFunc.size(); ++i)
+    for(int i = 0; i < (int)unrelatedFunc[id].size(); ++i)
     {
-      Function *F2 = f1->unrelatedFunc[i];
+      Function *F2 = unrelatedFunc[id][i];
       Constant* name = getFuncNameStr(builder, F2); //builder.CreateGlobalStringPtr(F2->getName());
       namesVec1.push_back(name);
     }
@@ -262,7 +410,7 @@ Function* makeMarkFunctionID(Module &M)
   args1.push_back(ConstantInt::get(Type::getInt32Ty(C), cnt));
   args1.push_back(tmp7_); args1.push_back(tmp4_); args1.push_back(tmp10_);
   builder.CreateCall(int2kHandleMetaData, args1);
-  */
+  
 	builder.CreateRetVoid();
 	return M.getFunction("markFunctionID");
 }
