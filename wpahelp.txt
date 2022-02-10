@@ -1,0 +1,149 @@
+OVERVIEW: Whole Program Points-to Analysis
+
+USAGE: wpa [options] <input bitcode>
+
+OPTIONS:
+
+Color Options:
+
+  --color                                           - Use colors in output (default=autodetect)
+
+General options:
+
+  --add-td-edge=<uint>                              - Add thread SVFG edges with models: 0 Non Add Edge; 1 NonSparse; 2 All Optimisation; 3 No MHP; 4 No Alias; 5 No Lock; 6 No Read Precision.
+  --alias-check                                     - Enable alias check functions
+  --all-pair-mhp                                    - All pair MHP computation
+  --ander-time-limit=<uint>                         - time limit for Andersen's analyses (ignored when -fs-time-limit set)
+  --anno=<uint>                                     - prune annotated instructions: 0001 Thread Local; 0002 Alias; 0004 MHP.
+  --blk                                             - Hanle blackhole edge
+  --brief-constraint-graph                          - Dump dot graph of Constraint Graph
+  --cfg-hide-deoptimize-paths                       - 
+  --cfg-hide-unreachable-paths                      - 
+  --ci-svfg                                         - Reduce SVFG into a context-insensitive one
+  Select alias check rule
+      --conservative                                   - return MayAlias if any pta says alias
+      --veto                                           - return NoAlias if any pta says no alias
+  --cpts                                            - Dump conditional points-to set 
+  --ctir-alias-eval                                 - Prints alias evaluation of ctir instructions in FS analyses
+  --cxt-bg=<ulong>                                  - Maximum step budget of context-sensitive traversing
+  --cxt-limit=<uint>                                - Source-Sink Analysis Contexts Limit
+  Select pointer analysis
+      --dfs                                            - Demand-driven flow sensitive analysis
+      --cxt                                            - Demand-driven context- flow- sensitive analysis
+  --diff                                            - Disable diff pts propagation
+  --dot-cfg-mssa=<file name for generated dot file> - file name for generated dot file
+  --dump-callgraph                                  - Dump dot graph of Call Graph
+  --dump-cha                                        - dump the class hierarchy graph
+  --dump-constraint-graph                           - Dump dot graph of Constraint Graph
+  --dump-free                                       - Dump use after free locations
+  --dump-function-pags=<string>                     - Dump PAG for functions
+  --dump-icfg                                       - Dump dot graph of ICFG
+  --dump-mssa                                       - Dump memory SSA
+  --dump-ocg                                        - Dump dot graph of Offline Constraint Graph
+  --dump-pag                                        - Dump dot graph of PAG
+  --dump-pag-shorter                                - If dumping dot graph of PAG, use shorter lines
+  --dump-slice                                      - Dump dot graph of Saber Slices
+  --dump-su-pts                                     - Dump strong updates store
+  --dump-su-store                                   - Dump strong updates store
+  --dump-tct                                        - Dump dot graph of Call Graph
+  --dump-uninit-ptr                                 - Dump uninitialised pointers
+  --dump-uninit-var                                 - Dump uninitialised variables
+  --dump-vfg                                        - Dump dot graph of VFG
+  --dwarn                                           - Disable warning
+  --enable-name-compression                         - Enable name/filename string compression
+  --enable-tcg                                      - Enable pointer analysis to use thread call graph
+  --extpags=<string>                                - ExternalPAGs to use during PAG construction (format: func1@/path/to/graph,func2@/foo,...
+  --ff-eq-base                                      - Treat base objects as their first fields
+  --field-limit=<uint>                              - Maximum number of fields for field sensitive analysis
+  --flow-bg=<ulong>                                 - Maximum step budget of flow-sensitive traversing
+  --fs-time-limit=<uint>                            - time limit for main phase of flow-sensitive analyses
+  --gen-icfg                                        - Generate ICFG graph
+  --graph-txt=<filename>                            - graph txt file to build PAG
+  --in-cycle                                        - Mark context insensitive SVFG edges due to value-flow cycles
+  --in-recur                                        - Mark context insensitive SVFG edges due to function recursions
+  --inc-data                                        - Enable incremental DFPTData for flow-sensitive analysis
+  --ind-call-limit=<uint>                           - Indirect solved call edge limit
+  --intra-lock-td-edge                              - Use simple intra-procedual lock for adding SVFG edges
+  --keep-aofi                                       - Keep formal-in and actual-out parameters
+  --keep-self-cycle=<keep self cycle>               - How to handle self cycle edges: all, context, none
+  --loc-mm                                          - Bytes/bits modeling of memory locations
+  --lock-analysis                                   - Run Lock Analysis
+  --lock-validation                                 - Print Lock Validation Results
+  --malloc-only                                     - Only add tainted objects for malloc
+  --marked-clocks-only                              - Only measure times where explicitly marked
+  --max-bdd-size=<uint>                             - Maximum context limit for DDA
+  --max-cxt=<uint>                                  - Maximum context limit for DDA
+  --max-path=<uint>                                 - Maximum path limit for DDA
+  --mem-par=<value>                                 - Memory region partiion strategies (e.g., for SVFG construction)
+    =distinct                                       -   memory region per each object
+    =intra-disjoint                                 -   memory regions partioned based on each function
+    =inter-disjoint                                 -   memory regions partioned across functions
+  --merge-pwc                                       - Enable PWC in graph solving
+  --mhp-validation                                  - Print MHP Validation Results
+  --model-consts                                    - Modeling individual constant objects
+  --mssa-fun=<string>                               - Please specify which function needs to be dumped
+  --mssa-ignore-dead-fun                            - Don't construct memory SSA for deadfunction
+  Select pointer analysis
+      --nander                                         - Standard inclusion-based analysis
+      --lander                                         - Lazy cycle detection inclusion-based analysis
+      --hander                                         - Hybrid cycle detection inclusion-based analysis
+      --hlander                                        - Hybrid lazy cycle detection inclusion-based analysis
+      --sander                                         - Selective cycle detection inclusion-based analysis
+      --sfrander                                       - Stride-based field representation includion-based analysis
+      --ander                                          - Diff wave propagation inclusion-based analysis
+      --steens                                         - Steensgaard's pointer analysis
+      --fspta                                          - Sparse flow sensitive pointer analysis
+      --fstbhc                                         - Sparse flow-sensitive type-based heap cloning pointer analysis
+      --vfspta                                         - Versioned sparse flow-sensitive points-to analysis
+      --type                                           - Type-based fast analysis for Callgraph, PAG and CHA
+  --node-alloc-strat=<value>                        - Method of allocating (LLVM) values and memory objects as node IDs
+    =dense                                          -   allocate objects together and values together, separately
+    =seq                                            -   allocate values and objects sequentially, intermixed
+    =debug                                          -   allocate value and objects sequentially, intermixed, except GEP objects as offsets (default)
+  --opt-svfg                                        - Optimize SVFG to eliminate formal-in and actual-out
+  --pcg-td-edge                                     - Use PCG lock for non-sparsely adding SVFG edges
+  --pre-field-sensitive                             - Use pre-computed field-sensitivity for later analysis
+  --print-aliases                                   - Print results for all pair aliases
+  --print-all-pts                                   - Print all points-to set of both top-level and address-taken variables
+  --print-constraint-graph                          - Print Constraint Graph to Terminal
+  --print-dchg                                      - print the DCHG if debug information is available
+  --print-fp                                        - Print targets of indirect call site
+  --print-interlev                                  - Print Thread Interleaving Results
+  --print-lock                                      - Print Thread Interleaving Results
+  --print-pag                                       - Print PAG to command line
+  --print-pc                                        - Print out path condition
+  --print-pts                                       - Print points-to set of top-level pointers
+  --print-query-pts                                 - Dump queries' conditional points-to set 
+  --print-symbol-table                              - Print Symbol Table to command line
+  --print-type                                      - Print type
+  --ptd=<value>                                     - Overarching points-to data structure
+    =mutable                                        -   points-to set per pointer
+    =persistent                                     -   points-to set ID per pointer, operations hash-consed
+  --query=<string>                                  - Please specify queries by inputing their pointer ids
+  --read-ander=<string>                             - Read Andersen's analysis results from a file
+  --rp-td-edge                                      - perform read precision to refine SVFG edges
+  --single-load                                     - Count load pointer with same source operand as one query
+  --single-vfg                                      - Create a single VFG shared by multiple analysis
+  --stat                                            - Statistic for Pointer analysis
+  --stat-limit=<uint>                               - Iteration budget for On-the-fly statistics
+  --stride-only                                     - Only use single stride in LocMemoryModel
+  --svf-main                                        - add svf.main()
+  --svfg                                            - Generate SVFG after Andersen's Analysis
+  --svfg-with-ind-call                              - Update Indirect Calls for SVFG using pre-analysis
+  --tbhc-all-reuse                                  - Allow for object reuse everywhere in FSTBHC
+  --tbhc-store-reuse                                - Allow for object reuse in at stores in FSTBHC
+  --tsan-ander                                      - Add TSan annotation according to Andersen
+  --tsan-fs                                         - Add TSan annotation according to flow-sensitive analysis
+  --uninit-heap                                     - detect uninitialized heap variables
+  --uninit-stack                                    - detect uninitialized stack variables
+  --v-call-cha                                      - connect virtual calls using cha
+  --valid-tests                                     - Validate memory leak tests
+  --wpa-num                                         - collect WPA FS number only 
+  --wpa-opt-svfg                                    - When using WPA pass, optimize SVFG to eliminate formal-in and actual-out (default false)
+  --write-ander=<string>                            - Write Andersen's analysis results to a file
+
+Generic Options:
+
+  --help                                            - Display available options (--help-hidden for more)
+  --help-list                                       - Display list of available options (--help-list-hidden for more)
+  --version                                         - Display the version of this program
