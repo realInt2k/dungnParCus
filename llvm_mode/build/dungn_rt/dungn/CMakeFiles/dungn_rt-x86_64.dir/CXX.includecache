@@ -63,12 +63,6 @@ fcntl.h
 -
 fstream
 -
-sys/mman.h
--
-sys/stat.h
--
-fcntl.h
--
 sanitizer_common/sanitizer_stacktrace.h
 /parmesan/llvm_mode/dungn_rt/dungn/sanitizer_common/sanitizer_stacktrace.h
 sanitizer_common/sanitizer_common.h

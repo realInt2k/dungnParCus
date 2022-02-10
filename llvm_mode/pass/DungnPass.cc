@@ -39,11 +39,14 @@ Function *markFunctionID; // this one calls all the NameToID and TranslateAddr
 Function *metaData; // this one will call the AddEdge
 
 //ICFG
+Function *iInt2kInitFlag;
 Function *iInt2kCheck;
 Function *iInt2kAddEdge;
 Function *iInt2kHandleMetaData;
 Function *iInt2kHandleFuncName;
 Function *iInt2kTranslateName;
+Function *iMarkFunctionID;
+Function *iInt2kLineNumToLineInfo;
 
 //Aibar
 Function *AibarFunc;
@@ -56,20 +59,25 @@ Value *flag; // GlobalVariable type
 Type *flagType;
 std::map<std::string, bool> focusedFunction;
 std::map<Function*, Constant*> funcNameStr;
+std::map<std::string, Constant*> nodeNameStr;
 
 Value *getAndInsertFuncPtr(IRBuilder<> &builder, LLVMContext &C, Function* F);
 Constant *getFuncNameStr(IRBuilder<> &builder, Function* F);
+Constant *getNodeNameStr(IRBuilder<> &builder, std::string s);
 Function *makeMarkFunctionID(Module &M);
+Function *makeIMarkFunctionID(Module &M);
 Function *makeMetaData(Module &M);
 Function *getPrint(Module &M);
 Function *getQuit(Module &M);
 
 //ICFG
+Function *getIInt2kInitFlag(Module &M);
 Function *getIInt2kCheck(Module &M);
 Function *getIInt2kAddEdge(Module &M);
 Function *getIInt2kHandleFuncName(Module &M);
 Function *getIInt2kTranslateName(Module &M);
 Function *getIInt2kHandleMetaData(Module &M);
+Function *getIInt2kLineNumToLineInfo(Module &M);
 
 Function *getInt2kCheck(Module &M); // exiter
 Function *getInt2kInitFlag(Module &M);
@@ -102,11 +110,13 @@ std::map<int, Function*> funcAddr;
 bool *visited;
 struct iNode {
   std::string name, info, func;
+  int lineNum;
   int ID;
   iNode(std::string x, std::string y, std::string z){name = x; info = y; func = z;}
 };
 std::map<std::string, iNode*> iNodeMap;
 std::map<std::string, int> iNodeToInt;
+std::vector<bool> instrumentedLine;
 std::vector<iNode*> iNodeList;
 std::vector<int> *iAdj;
 std::vector<int> *iUnReachable;
@@ -132,8 +142,41 @@ struct Int2kVisitor : public InstVisitor<Int2kVisitor>
     //errs() << F.getName() << "\n";
     SmallVector<Value*, 1> params;
     params.push_back(funcNameStr);
-    //builder.CreateCall(int2kCheck, params);
+    builder.CreateCall(int2kCheck, params);
+    for(Function::iterator bb = F.begin(), bbe = F.end(); bb != bbe; bb++)
+    {
+      BasicBlock *basicBlock = &*bb;
+      for(BasicBlock::iterator i = basicBlock->begin(), ie = basicBlock->end(); i!=ie; i++) 
+      {
+        Instruction *I = (&*i);
+        if(I->getDebugLoc())
+        {
+          errs() << *I << " ->  " << (I->getDebugLoc()).getLine() << " " << (I->getDebugLoc()).getCol() << "\n";
+          if(!instrumentedLine[ (I->getDebugLoc()).getLine() ])
+          {
+            for(int i = 0; i < (int)iNodeList.size(); ++i) 
+            {
+              if(iNodeList[i]->lineNum == (I->getDebugLoc()).getLine()) 
+              {
+                instrumentedLine[  (I->getDebugLoc()).getLine() ] = 1;
+                IRBuilder<> builder(I);
+                Value *nodeNameStr = getNodeNameStr(builder, iNodeList[i]->info);
+                SmallVector<Value*, 1> params;
+                params.push_back(nodeNameStr);
+                builder.CreateCall(iInt2kCheck, params);
+                break;
+              }
+            }
+          }
+        } else
+          errs() << *I << " ->  " << " nan nan \n";
+      }
+    }
     //builder.CreateCall(AibarFunc, params);
+  }
+  void visitInstruction (Instruction &I)
+  {
+    
   }
 };
 
@@ -152,15 +195,16 @@ void getThings(Module &M)
     int2kHandleFuncName = getInt2kHandleFuncName(M);
     int2kHandleMetaData = getInt2kHandleMetaData(M);
     //ICFG
+    iInt2kLineNumToLineInfo = getIInt2kLineNumToLineInfo(M);
+    iInt2kInitFlag = getIInt2kInitFlag(M);
     iInt2kCheck = getIInt2kCheck(M);
     iInt2kAddEdge = getIInt2kAddEdge(M);
     iInt2kHandleMetaData = getIInt2kHandleMetaData(M);
     iInt2kHandleFuncName = getIInt2kHandleFuncName(M);
     iInt2kTranslateName = getIInt2kTranslateName(M);
-    //makeMetaData(M);
-    makeMarkFunctionID(M); 
-    //ICFG
-    makeIMarkFunctionID(M);	
+  
+    makeIMarkFunctionID(M); 
+    makeMarkFunctionID(M);	
     //AibarFunc = getAibarFunc(M);
 }
 
@@ -176,6 +220,7 @@ void insertThings(Module &M)
     }
     Int2kVisitor int2kVisitor;
     int2kVisitor.visit(M);
+    errs() << "pre M begin \n";
     for(auto f = M.begin(), fe = M.end(); f!=fe; ++f)
     {
       Function *F = &*f;
@@ -185,7 +230,7 @@ void insertThings(Module &M)
         std::vector<Value*> arg;
         for(auto i = F->arg_begin(), iE = F->arg_end(); i != iE; ++i)
             arg.push_back(i);
-         
+        errs() << "1" << "\n";
         BasicBlock *bStart = &*(F->begin());
         BasicBlock *bEnd = &(F->back());
         IRBuilder<> builder(bStart, bStart->begin());
@@ -193,17 +238,21 @@ void insertThings(Module &M)
         SmallVector<Value*, 1> params;
         params.push_back(ConstantInt::get(Type::getInt32Ty(C), nFunction));
         builder.CreateCall(int2kInitFlag, params); 
-        
+        params.clear();
+        params.push_back(ConstantInt::get(Type::getInt32Ty(C), iNodeList.size()));
+        builder.CreateCall(iInt2kInitFlag, params); 
         // insert metaData function
         SmallVector<Value*, 0> params1;
         // insert init translation from funcPtr||funcName to ID
         builder.CreateCall(markFunctionID, params1);
+        builder.CreateCall(iMarkFunctionID, params1);
         // insert argument handler
-        
-        SmallVector<Value*, 2> params2;
-        params2.push_back(arg[0]);
-        params2.push_back(arg[1]);
-        builder.CreateCall(int2kHandleArg, params2);
+        if(arg.size() >= 2) {
+          SmallVector<Value*, 2> params2;
+          params2.push_back(arg[0]);
+          params2.push_back(arg[1]);
+          builder.CreateCall(int2kHandleArg, params2);
+        }
         BasicBlock::iterator it = bEnd->end();
         it--;
         IRBuilder<> builderEnd(bEnd, it);
@@ -241,10 +290,11 @@ bool DungN::runOnModule(Module &M)
   //  needInstrument[needInstrumentedFunc[i]] = true;
   //}
 	getThings(M);
+  errs() << "Done getting things\n";
 	insertThings(M);
   errs() << "finished DungN pass\n";
-  system("rm callgraph_final.dot callgraph_initial.dot 1> /dev/null");
-  system("rm int2kGraph.txt int2kInfo.txt int2kBC.txt int2kBC.bc 1> /dev/null");
+  //system("rm callgraph_final.dot callgraph_initial.dot 1> /dev/null");
+  system("rm int2kGraph.txt int2kInfo.txt int2kBC.bc int2kBC.txt 1> /dev/null");
   errs() << "\n";
   freemem();
   return false;
@@ -317,6 +367,7 @@ void readICFG()
   std::fstream file;
   file.open("int2kTmp.txt", std::ios::in);
   file >> nINode >> nIEdge;
+  int tmpMax = 0; // maxline
   for(int i = 0; i < nINode; ++i)
   {
     file.ignore(256, '\n');
@@ -324,8 +375,28 @@ void readICFG()
     std::getline(file, x); 
     std::getline(file, y); 
     std::getline(file, z); 
-    errs() << x << "\n" << y << "\n" << z << "\n ------------\n";
     iNode *node = new iNode(x, y, z);
+    int ln = 0;
+    for(int j = 0; j < strlen(y.c_str())-2; ++j)
+    {
+      if(y[j] == 'l' && y[j+1] == 'n' && y[j+2] == ':') 
+      {
+        while(y[j] > '9' || y[j] < '0') 
+          j++;
+        while(y[j] <= '9' && y[j] >= '0')
+        {
+          ln = ln * 10 + (y[j] - '0');
+          j++;
+        }
+        break;
+      }
+      if(tmpMax < ln)
+        tmpMax = ln;
+    }
+    for(int i = 0; i <= tmpMax; ++i)
+      instrumentedLine.push_back(0);
+    node->lineNum = ln;
+    errs() << x << "\n" << y << "\n" << z << "\n" << ln << "\n ------------\n";
     iNodeMap[x] = node;
     iNodeList.push_back(node);
   }
@@ -425,7 +496,18 @@ void dumpToFile(Module &M)
   //errs() << "int2kBC.bc created\n";
 }
 
-Function *getIInt2kHandleMetaData(Mobule &M)
+Function *getIInt2kLineNumToLineInfo(Module &M)
+{
+  LLVMContext &C = M.getContext();
+  SmallVector<Type*, 2> params;
+  params.push_back(Type::getInt32Ty(C));
+  params.push_back(Type::getInt8PtrTy(C)->getPointerTo());
+  FunctionType *FT = FunctionType::get(Type::getVoidTy(C), params, false);
+  M.getOrInsertFunction("_iInt2k_lineNumToLineInfo", FT);
+  return M.getFunction("_iInt2k_lineNumToLineInfo");
+}
+
+Function *getIInt2kHandleMetaData(Module &M)
 {
   LLVMContext &C = M.getContext();
   SmallVector<Type*, 4> params;
@@ -457,14 +539,13 @@ Function *makeIMarkFunctionID(Module &M)
   SmallVector<Type*, 0> params;
   FunctionType *FT = FunctionType::get(Type::getVoidTy(C), params, false);
   M.getOrInsertFunction("iMarkFunctionID", FT);
-  markFunctionID = M.getFunction("iMarkFunctionID");
-  BasicBlock* block = BasicBlock::Create(C, "entry", markFunctionID);
+  iMarkFunctionID = M.getFunction("iMarkFunctionID");
+  BasicBlock* block = BasicBlock::Create(C, "entry", iMarkFunctionID);
   IRBuilder<> builder(block);
   int cnt = 0;
   std::vector<Constant*> namesVec;
   for(int i = 0; i < iNodeList.size(); ++i)
   {
-    Function *F = &*f;
     Constant* name = getNodeNameStr(builder, iNodeList[i]->info); //builder.CreateGlobalStringPtr(F->getName());
     namesVec.push_back(name);
     cnt ++;
@@ -499,16 +580,19 @@ Function *makeIMarkFunctionID(Module &M)
   bIndex.push_back(ConstantInt::get(Type::getInt32Ty(C), 0));
   int sum = 0;
   cnt = 1;
+  //errs() << "iNodeList.size() == "<<iNodeList.size()<<"\n";
   for(int i = 0; i < iNodeList.size(); ++i)
   {
     int id1 = i; 
     sum += (int)iUnReachable[id1].size();
     bIndex.push_back(ConstantInt::get(Type::getInt32Ty(C), sum));
-    for(int i = 0; i < (int)unrelatedFunc[id1].size(); ++i)
+    //errs() << i << ": " << (int)iUnReachable[i].size() << "\n";
+    for(int j = 0; j < (int)iUnReachable[id1].size(); ++j)
     {
-      int id2 = iUnReachable[id1][i];
+      int id2 = iUnReachable[id1][j];
       std::string s = iNodeList[id2]->info;
-      Constant* name = getNode NameStr(builder, s); //builder.CreateGlobalStringPtr(F2->getName());
+      //errs() << j << ": " << "s is " << s << "\n";
+      Constant* name = getNodeNameStr(builder, s); //builder.CreateGlobalStringPtr(F2->getName());
       namesVec1.push_back(name);
     }
   }
@@ -535,7 +619,18 @@ Function *makeIMarkFunctionID(Module &M)
   args1.push_back(ConstantInt::get(Type::getInt32Ty(C), cnt));
   args1.push_back(tmp7_); args1.push_back(tmp4_); args1.push_back(tmp10_);
   builder.CreateCall(iInt2kHandleMetaData, args1);
-  
+  /* * * * * * * * * * * * * * * * * * * * * * *
+   * Now we push all the line info to the lineNumToInfo . *
+   * * * * * * * * * * * * * * * * * * * * * * */
+  std::vector<Value*> args2;
+  for(int i = 0; i < iNodeList.size(); ++i) 
+  {
+    Constant* name = getNodeNameStr(builder, iNodeList[i]->info);
+    args2.push_back(ConstantInt::get(Type::getInt32Ty(C), iNodeList[i]->lineNum));
+    args2.push_back(name);
+    builder.CreateCall(iInt2kLineNumToLineInfo, args2);
+    args2.clear();
+  }
 	builder.CreateRetVoid();
 	return M.getFunction("iMarkFunctionID");
 }
@@ -722,6 +817,17 @@ Function *getInt2kCheck(Module &M) // exiter
   M.getOrInsertFunction("_int2k_check", FT);
   return M.getFunction("_int2k_check");
 }
+//ICFG
+Function *getIInt2kInitFlag(Module &M) 
+{
+  LLVMContext &C = M.getContext();
+  SmallVector<Type *, 1> params;
+  params.push_back(Type::getInt32Ty(C));
+  FunctionType *FT = FunctionType::get(Type::getVoidTy(C), params, false);
+  M.getOrInsertFunction("_iInt2k_init_flag", FT);
+  return M.getFunction("_iInt2k_init_flag");
+}
+
 Function *getInt2kInitFlag(Module &M) 
 {
   LLVMContext &C = M.getContext();
@@ -804,6 +910,19 @@ Function *getInt2kHandleFuncName(Module &M)
   M.getOrInsertFunction("_int2k_handle_function_name", FT);
   return M.getFunction("_int2k_handle_function_name");
 }
+
+Function *getIInt2kTranslateName(Module &M)
+{
+  LLVMContext &C = M.getContext();
+  SmallVector<Type*, 2> params;
+  params.push_back(Type::getInt8PtrTy(C));
+  params.push_back(Type::getInt32Ty(C)); 
+  FunctionType *FT = FunctionType::get(Type::getVoidTy(C), params, false);
+  M.getOrInsertFunction("_iInt2k_translateName", FT);
+  return M.getFunction("_iInt2k_translateName");
+}
+
+
 Function *getInt2kTranslateName(Module &M)
 {
   LLVMContext &C = M.getContext();
