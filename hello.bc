@@ -85,7 +85,7 @@ declare void @_int2k_handle_function_name(i32, i8**)
 
 declare void @_int2k_handle_meta_data(i32, i32*, i8**, i8**)
 
-declare void @_iInt2k_lineNumToLineInfo(i32, i8**)
+declare void @_iInt2k_lineNumToLineInfo(i32, i8*)
 
 declare void @_iInt2k_init_flag(i32)
 

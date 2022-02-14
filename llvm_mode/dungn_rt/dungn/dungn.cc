@@ -45,7 +45,7 @@ bool _int2k_visitedMain = false;
 
 //ICFG 
 extern "C" SANITIZER_INTERFACE_ATTRIBUTE
-void _iInt2k_lineNumToInfo(int ln, char *name);
+void _iInt2k_lineNumToLineInfo(int ln, char *name);
 
 //ICFG
 extern "C" SANITIZER_INTERFACE_ATTRIBUTE

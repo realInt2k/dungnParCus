@@ -478,7 +478,7 @@ void readSVF()
 
 int runSVF()
 {
-  int res = system("wpa -ander -dump-callgraph int2kBC.bc > /dev/null");
+  int res = system("wpa -steens -dump-callgraph int2kBC.bc > /dev/null");
   if(res != 0)
     errs () << "run SVF command failed, should install SVF first. \n";
   else
@@ -501,7 +501,7 @@ Function *getIInt2kLineNumToLineInfo(Module &M)
   LLVMContext &C = M.getContext();
   SmallVector<Type*, 2> params;
   params.push_back(Type::getInt32Ty(C));
-  params.push_back(Type::getInt8PtrTy(C)->getPointerTo());
+  params.push_back(Type::getInt8PtrTy(C));
   FunctionType *FT = FunctionType::get(Type::getVoidTy(C), params, false);
   M.getOrInsertFunction("_iInt2k_lineNumToLineInfo", FT);
   return M.getFunction("_iInt2k_lineNumToLineInfo");
